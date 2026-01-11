@@ -86,9 +86,88 @@ const {Jwt_secret} = require("../keys");
 //   }
 // });
 
+
+// -------------------------------------------------------------------------------------
+
+// router.post('/addtocart', async (req, res) => {
+//   try {
+//     const { userId, productId, image, title, price } = req.body;
+
+//     // Validate if userId is provided
+//     if (!userId) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'User ID is required'
+//       });
+//     }
+
+//     // Validate if userId is a valid MongoDB ObjectId
+//     if (!mongoose.Types.ObjectId.isValid(userId)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Invalid user ID format'
+//       });
+//     }
+
+//     // Find user by ID
+//     const user = await USER.findById(userId);
+    
+//     if (!user) {
+//       return res.status(404).json({
+//         success: false,
+//         message: 'User not found'
+//       });
+//     }
+
+//     // Initialize cart array if it doesn't exist
+//     if (!user.cart) {
+//       user.cart = [];
+//     }
+
+//     // Check if product with same ID AND title already exists in cart
+//     const existingItemIndex = user.cart.findIndex(
+//       item => item.productId === productId && item.title === title
+//     );
+
+//     if (existingItemIndex !== -1) {
+//       // Product with same ID and title exists, increment quantity
+//       user.cart[existingItemIndex].quantity += 1;
+//     } else {
+//       // Add new product to cart (different size/variant)
+//       user.cart.push({
+//         productId,
+//         image,
+//         title,
+//         price,
+//         quantity: 1,
+//         addedAt: new Date()
+//       });
+//     }
+
+//     // Save updated user
+//     await user.save();
+
+//     res.status(200).json({
+//       success: true,
+//       message: 'Item added to cart successfully',
+//       cart: user.cart
+//     });
+
+//   } catch (error) {
+//     console.error('Error adding to cart:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: 'Server error',
+//       error: error.message
+//     });
+//   }
+// });
+
+
+
 router.post('/addtocart', async (req, res) => {
   try {
-    const { userId, productId, image, title, price } = req.body;
+    const { userId, productId, image, title, price, quantityType } = req.body;
 
     // Validate if userId is provided
     if (!userId) {
@@ -121,21 +200,22 @@ router.post('/addtocart', async (req, res) => {
       user.cart = [];
     }
 
-    // Check if product with same ID AND title already exists in cart
+    // Check if EXACT same product (same ID, title, AND quantityType) exists
     const existingItemIndex = user.cart.findIndex(
-      item => item.productId === productId && item.title === title
+      item => item.productId === productId && item.title === title && item.quantityType === quantityType
     );
 
     if (existingItemIndex !== -1) {
-      // Product with same ID and title exists, increment quantity
+      // Exact same product exists, increment quantity only
       user.cart[existingItemIndex].quantity += 1;
     } else {
-      // Add new product to cart (different size/variant)
+      // Different variant (size) - add as new entry
       user.cart.push({
         productId,
         image,
         title,
         price,
+        quantityType,  // Store the quantity type (50, 100, 200)
         quantity: 1,
         addedAt: new Date()
       });
@@ -159,6 +239,7 @@ router.post('/addtocart', async (req, res) => {
     });
   }
 });
+
 
 router.get('/getcart/:userId', async (req, res) => {
   try {

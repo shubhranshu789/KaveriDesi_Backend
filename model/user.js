@@ -40,6 +40,7 @@ const userSchema = new mongoose.Schema({
             required: true,
             default: 1
         },
+        quantityType: { type: Number },
         addedAt: {
             type: Date,
             default: Date.now
