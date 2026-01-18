@@ -8,52 +8,188 @@ const USER = mongoose.model("USER");
 
 
 
+
+// router.post('/placeorder', async (req, res) => {
+//   try {
+//     const {
+//       userId,
+//       orderId,
+//       orderItems,
+//       totalAmount,
+//       orderStatus,
+//       paymentMethod,
+//       paymentStatus,
+//       shippingAddress
+//     } = req.body;
+
+//     const user = await USER.findById(userId);
+    
+//     if (!user) {
+//       return res.status(404).json({ success: false, message: 'User not found' });
+//     }
+
+//     // Create new order object
+//     const newOrder = {
+//       orderId,
+//       orderDate: new Date(),
+//       orderItems,
+//       totalAmount,
+//       orderStatus,
+//       paymentMethod,
+//       paymentStatus,
+//       shippingAddress
+//     };
+
+//     // Add to user's placedOrders array
+//     user.placedOrders.push(newOrder);
+//     await user.save();
+
+//     res.status(200).json({
+//       success: true,
+//       message: 'Order placed successfully',
+//       orderId
+//     });
+//   } catch (error) {
+//     console.error('Error placing order:', error);
+//     res.status(500).json({ success: false, message: 'Server error' });
+//   }
+// });
+
+
 router.post('/placeorder', async (req, res) => {
   try {
+    // console.log('📦 Received order request:', JSON.stringify(req.body, null, 2));
+    
     const {
       userId,
       orderId,
       orderItems,
+      subTotal,
+      discountAmount,
       totalAmount,
       orderStatus,
       paymentMethod,
       paymentStatus,
-      shippingAddress
+      paymentDetails,
+      shippingAddress,
+      couponDiscount
     } = req.body;
 
+    // Validate required fields
+    if (!userId) {
+      console.error('❌ Missing userId');
+      return res.status(400).json({ success: false, message: 'User ID is required' });
+    }
+
+    if (!orderId) {
+      console.error('❌ Missing orderId');
+      return res.status(400).json({ success: false, message: 'Order ID is required' });
+    }
+
+    if (!orderItems || !Array.isArray(orderItems) || orderItems.length === 0) {
+      console.error('❌ Invalid orderItems');
+      return res.status(400).json({ success: false, message: 'Order items are required' });
+    }
+
+    if (!shippingAddress || !shippingAddress.fullName) {
+      console.error('❌ Invalid shippingAddress');
+      return res.status(400).json({ success: false, message: 'Complete shipping address is required' });
+    }
+
+    // Find user
     const user = await USER.findById(userId);
     
     if (!user) {
+      console.error('❌ User not found:', userId);
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    // Create new order object
+    console.log('✅ User found:', user.email);
+
+    // Create new order object with all fields
     const newOrder = {
-      orderId,
+      orderId: orderId,
       orderDate: new Date(),
-      orderItems,
-      totalAmount,
-      orderStatus,
-      paymentMethod,
-      paymentStatus,
-      shippingAddress
+      orderItems: orderItems.map(item => ({
+        productId: item.productId,
+        title: item.title,
+        price: parseFloat(item.price) || 0,
+        quantity: parseInt(item.quantity) || 1,
+        image: item.image || ''
+      })),
+      subTotal: parseFloat(subTotal) || 0,
+      discountAmount: parseFloat(discountAmount) || 0,
+      couponDiscount: parseFloat(couponDiscount) || 0,
+      totalAmount: parseFloat(totalAmount) || 0,
+      orderStatus: orderStatus || 'pending',
+      paymentMethod: paymentMethod || 'cod',
+      paymentStatus: paymentStatus || 'pending',
+      paymentDetails: paymentDetails || {},
+      shippingAddress: {
+        fullName: shippingAddress.fullName?.trim() || '',
+        phone: shippingAddress.phone?.trim() || '',
+        addressLine1: shippingAddress.addressLine1?.trim() || '',
+        addressLine2: shippingAddress.addressLine2?.trim() || '',
+        city: shippingAddress.city?.trim() || '',
+        state: shippingAddress.state?.trim() || '',
+        pincode: shippingAddress.pincode?.trim() || '',
+        country: shippingAddress.country || 'India'
+      },
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
+
+    // console.log('💾 Attempting to save order:', newOrder.orderId);
 
     // Add to user's placedOrders array
     user.placedOrders.push(newOrder);
+    
+    // Save with error handling
     await user.save();
+
+    console.log('✅ Order saved successfully for user:', user.email);
 
     res.status(200).json({
       success: true,
       message: 'Order placed successfully',
-      orderId
+      orderId: orderId,
+      order: newOrder
     });
+    
   } catch (error) {
-    console.error('Error placing order:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
+    console.error('❌ Error placing order:', error);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    
+    // Handle specific MongoDB/Mongoose errors
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(err => err.message);
+      console.error('Validation errors:', messages);
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        error: messages.join(', ')
+      });
+    }
+    
+    if (error.name === 'CastError') {
+      console.error('Cast error:', error.message);
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid data format',
+        error: error.message
+      });
+    }
+    
+    // Generic error response with details
+    res.status(500).json({
+      success: false,
+      message: 'Server error while placing order',
+      error: error.message || 'Internal server error'
+    });
   }
 });
-
 
 
 router.post('/clearcart/:userId', async (req, res) => {
@@ -259,6 +395,42 @@ router.post('/apply-coupon', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+
+// Example Express.js endpoint
+
+const razorpay = new Razorpay({
+  key_id: 'rzp_test_S2KmVnYY70GNfF',
+  key_secret: 'o9pkCv84xw8W7mbyqdPjyFRK' // Keep this secure on backend only
+});
+
+router.post('/create-razorpay-order', async (req, res) => {
+  try {
+    const { amount, currency, receipt } = req.body;
+    
+    const options = {
+      amount: amount, // amount in paise
+      currency: currency || 'INR',
+      receipt: receipt || `receipt_${Date.now()}`
+    };
+    
+    const order = await razorpay.orders.create(options);
+    
+    res.json({
+      success: true,
+      id: order.id,
+      amount: order.amount,
+      currency: order.currency
+    });
+  } catch (error) {
+    console.error('Razorpay order creation error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create payment order',
+      error: error.message
+    });
   }
 });
 

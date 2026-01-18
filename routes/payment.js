@@ -3,6 +3,8 @@ const router = express.Router();
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
+const Razorpay = require('razorpay');
+
 
 // Initialize Razorpay instance
 const razorpayInstance = new Razorpay({
@@ -376,5 +378,43 @@ router.get('/getorders/:userId', async (req, res) => {
     });
   }
 });
+
+// Example Express.js endpoint
+
+const razorpay = new Razorpay({
+  key_id: 'rzp_test_S2KmVnYY70GNfF',
+  key_secret: 'o9pkCv84xw8W7mbyqdPjyFRK' // Keep this secure on backend only
+});
+
+app.post('/create-razorpay-order', async (req, res) => {
+  try {
+    const { amount, currency, receipt } = req.body;
+    
+    const options = {
+      amount: amount, // amount in paise
+      currency: currency || 'INR',
+      receipt: receipt || `receipt_${Date.now()}`
+    };
+    
+    const order = await razorpay.orders.create(options);
+    
+    res.json({
+      success: true,
+      id: order.id,
+      amount: order.amount,
+      currency: order.currency
+    });
+  } catch (error) {
+    console.error('Razorpay order creation error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create payment order',
+      error: error.message
+    });
+  }
+});
+
+
+
 
 module.exports = router;

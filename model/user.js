@@ -17,6 +17,11 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    role: {
+        type: String,
+        enum: ['user', 'admin'],
+        default: 'user'
+    },
 
     cart: [{
         productId: {
@@ -40,7 +45,9 @@ const userSchema = new mongoose.Schema({
             required: true,
             default: 1
         },
-        quantityType: { type: Number },
+        quantityType: { 
+            type: String 
+        },
         addedAt: {
             type: Date,
             default: Date.now
@@ -48,39 +55,39 @@ const userSchema = new mongoose.Schema({
     }],
 
     wishlist: [{
-    productId: {
-      type: String,
-      required: true
-    },
-    image: {
-      type: String,
-      required: true
-    },
-    title: {
-      type: String,
-      required: true
-    },
-    price: {
-      type: String,
-      required: true
-    },
-    quantity: {
-      type: Number,
-      required: true,
-      default: 1
-    },
-    addedAt: {
-      type: Date,
-      default: Date.now
-    }
-  }],
+        productId: {
+            type: String,
+            required: true
+        },
+        image: {
+            type: String,
+            required: true
+        },
+        title: {
+            type: String,
+            required: true
+        },
+        price: {
+            type: String,
+            required: true
+        },
+        quantity: {
+            type: Number,
+            required: true,
+            default: 1
+        },
+        addedAt: {
+            type: Date,
+            default: Date.now
+        }
+    }],
 
-    // Placed Orders field - array of order objects
+    // Enhanced Placed Orders field with all necessary fields
     placedOrders: [{
         orderId: {
             type: String,
-            required: true,
-            unique: true
+            required: true
+            // Remove 'unique: true' from subdocument - it causes issues
         },
         orderDate: {
             type: Date,
@@ -93,14 +100,14 @@ const userSchema = new mongoose.Schema({
             },
             image: {
                 type: String,
-                required: true
+                default: ''
             },
             title: {
                 type: String,
                 required: true
             },
             price: {
-                type: String,
+                type: Number, // Changed from String to Number for calculations
                 required: true
             },
             quantity: {
@@ -109,53 +116,135 @@ const userSchema = new mongoose.Schema({
                 default: 1
             }
         }],
+        
+        // NEW: Price breakdown fields
+        subTotal: {
+            type: Number,
+            default: 0
+        },
+        discountAmount: {
+            type: Number,
+            default: 0
+        },
+        couponDiscount: {
+            type: Number,
+            default: 0
+        },
         totalAmount: {
             type: Number,
             required: true
         },
+        
         orderStatus: {
             type: String,
-            enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
+            enum: ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'],
             default: 'pending'
         },
+        
+        // NEW: Updated payment method to include 'razorpay' and 'online'
         paymentMethod: {
             type: String,
-            enum: ['cod', 'card', 'upi', 'netbanking'],
+            enum: ['cod', 'razorpay', 'online', 'card', 'upi', 'netbanking'],
             required: true
         },
+        
         paymentStatus: {
             type: String,
-            enum: ['pending', 'completed', 'failed', 'refunded'],
+            enum: ['pending', 'paid', 'completed', 'failed', 'refunded'],
             default: 'pending'
         },
+        
+        // NEW: Payment details for Razorpay transactions
+        paymentDetails: {
+            razorpay_payment_id: {
+                type: String,
+                default: ''
+            },
+            razorpay_order_id: {
+                type: String,
+                default: ''
+            },
+            razorpay_signature: {
+                type: String,
+                default: ''
+            }
+        },
+        
         shippingAddress: {
-            fullName: String,
-            phone: String,
-            addressLine1: String,
-            addressLine2: String,
-            city: String,
-            state: String,
-            pincode: String,
+            fullName: {
+                type: String,
+                required: true
+            },
+            phone: {
+                type: String,
+                required: true
+            },
+            addressLine1: {
+                type: String,
+                required: true
+            },
+            addressLine2: {
+                type: String,
+                default: ''
+            },
+            city: {
+                type: String,
+                required: true
+            },
+            state: {
+                type: String,
+                required: true
+            },
+            pincode: {
+                type: String,
+                required: true
+            },
             country: {
                 type: String,
                 default: 'India'
             }
         },
+        
         trackingId: {
-            type: String
+            type: String,
+            default: ''
         },
+        
         deliveredAt: {
             type: Date
         },
+        
         cancelledAt: {
             type: Date
         },
+        
         cancellationReason: {
-            type: String
+            type: String,
+            default: ''
+        },
+        
+        // NEW: Additional tracking fields
+        estimatedDelivery: {
+            type: Date
+        },
+        
+        shippedAt: {
+            type: Date
+        },
+        
+        updatedAt: {
+            type: Date,
+            default: Date.now
         }
     }]
 }, {
-    timestamps: true // Adds createdAt and updatedAt automatically
+    timestamps: true // Adds createdAt and updatedAt automatically to the user document
 });
 
-mongoose.model("USER", userSchema);
+// Add index for faster queries on orderId
+userSchema.index({ 'placedOrders.orderId': 1 });
+
+// Add index for email (should be unique)
+userSchema.index({ email: 1 }, { unique: true });
+
+module.exports = mongoose.model("USER", userSchema);
